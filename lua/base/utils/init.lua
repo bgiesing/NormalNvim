@@ -108,18 +108,31 @@ function M.del_autocmds_from_buffer(augroup, bufnr)
   end
 end
 
---- Get an icon from `lspkind` if it is available and return it.
---- @param kind string The kind of icon in `lspkind` to retrieve.
+--- Get an icon from given its icon name.
+--- if vim.g.fallback_icons_enabled = true, it will return a fallback icon
+--- unless specified otherwise.
+--- @param icon_name string Name of the icon to retrieve.
+--- @param fallback_to_empty_string boolean|nil If this parameter is true, when `vim.g.fallback_icons_enabled = true` then `get_icon()` will return empty string.
 --- @return string icon.
-function M.get_icon(kind, padding, no_fallback)
-  if not vim.g.icons_enabled and no_fallback then return "" end
-  local icon_pack = vim.g.icons_enabled and "icons" or "text_icons"
-  if not M[icon_pack] then
-    M.icons = require("base.icons.nerd_font")
-    M.text_icons = require("base.icons.text")
+function M.get_icon(icon_name, fallback_to_empty_string)
+  -- guard clause
+  if fallback_to_empty_string and vim.g.fallback_icons_enabled then return "" end
+
+  -- get icon_pack
+  local icon_pack = (vim.g.fallback_icons_enabled and "fallback_icons_enabled") or "icons"
+
+  -- cache icon_pack into M
+  if not M[icon_pack] then -- only if not cached already.
+    if icon_pack == "icons" then
+      M.icons = require("base.icons.icons")
+    elseif icon_pack =="fallback_icons_enabled" then
+      M.fallback_icons_enabled = require("base.icons.fallback_icons_enabled")
+    end
   end
-  local icon = M[icon_pack] and M[icon_pack][kind]
-  return icon and icon .. string.rep(" ", padding or 0) or ""
+
+  -- return specified icon
+  local icon = M[icon_pack] and M[icon_pack][icon_name]
+  return icon
 end
 
 --- Get an empty table of mappings with a key for each map mode.
@@ -256,8 +269,13 @@ end
 --- Open the file or url under the cursor.
 --- @param path string The path of the file to open with the system opener.
 function M.open_with_program(path)
+  -- guard clause: If a opener already exists, use it.
   if vim.ui.open then return vim.ui.open(path) end
+
+  -- command to run
   local cmd
+
+  -- cmd is different depending the OS
   if vim.fn.has("mac") == 1 then
     cmd = { "open" }
   elseif vim.fn.has("win32") == 1 then
@@ -267,18 +285,22 @@ function M.open_with_program(path)
       cmd = { "cmd.exe", "/K", "explorer" }
     end
   elseif vim.fn.has("unix") == 1 then
-    if vim.fn.executable "explorer.exe" == 1 then -- available in WSL
+    if vim.fn.executable("explorer.exe") == 1 then -- available in WSL
       cmd = { "explorer.exe" }
-    elseif vim.fn.executable "xdg-open" == 1 then
+    elseif vim.fn.executable("xdg-open") == 1 then
       cmd = { "xdg-open" }
     end
   end
   if not cmd then M.notify("Available system opening tool not found!", vim.log.levels.ERROR) end
+
+  -- No path provided? use the file under the cursor; else, expand the path.
   if not path then
-    path = vim.fn.expand "<cfile>"
+    path = vim.fn.expand("<cfile>")
   elseif not path:match "%w+:" then
     path = vim.fn.expand(path)
   end
+
+  -- start job (detached)
   vim.fn.jobstart(vim.list_extend(cmd, { path }), { detach = true })
 end
 

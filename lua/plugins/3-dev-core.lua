@@ -152,7 +152,7 @@ return {
     opts = {
       heading = {
         sign = false,
-        icons = { ' ', ' ', '󰲥 ', '󰲧 ', '󰲩 ', '󰲫 ' },
+        icons = require("base.utils").get_icon("RenderMarkdown"),
         width = "block",
       },
       code = {
@@ -262,9 +262,9 @@ return {
       },
       ui = {
         icons = {
-          package_installed = "✓",
-          package_uninstalled = "✗",
-          package_pending = "⟳",
+          package_installed = require("base.utils").get_icon("MasonInstalled"),
+          package_uninstalled = require("base.utils").get_icon("MasonUninstalled"),
+          package_pending = require("base.utils").get_icon("MasonPending"),
         },
       },
     }
@@ -497,13 +497,16 @@ return {
       -- ensure dependencies exist
       local cmp = require("cmp")
       local luasnip = require("luasnip")
-      local lspkind = require("lspkind")
+      local lspkind_loaded, lspkind = pcall(require, "lspkind")
 
       -- border opts
       local border_opts = {
         border = "rounded",
         winhighlight = "Normal:NormalFloat,FloatBorder:FloatBorder,CursorLine:PmenuSel,Search:None",
       }
+      local cmp_config_window = (
+        vim.g.lsp_round_borders_enabled and cmp.config.window.bordered(border_opts)
+      ) or cmp.config.window
 
       -- helper
       local function has_words_before()
@@ -526,7 +529,7 @@ return {
         preselect = cmp.PreselectMode.None,
         formatting = {
           fields = { "kind", "abbr", "menu" },
-          format = lspkind.cmp_format(utils.get_plugin_opts("lspkind.nvim")),
+          format = (lspkind_loaded and lspkind.cmp_format(utils.get_plugin_opts("lspkind.nvim"))) or nil
         },
         snippet = {
           expand = function(args) luasnip.lsp_expand(args.body) end,
@@ -544,8 +547,8 @@ return {
           select = false,
         },
         window = {
-          completion = cmp.config.window.bordered(border_opts),
-          documentation = cmp.config.window.bordered(border_opts),
+          completion = cmp_config_window,
+          documentation = cmp_config_window,
         },
         mapping = {
           ["<PageUp>"] = cmp.mapping.select_prev_item {
